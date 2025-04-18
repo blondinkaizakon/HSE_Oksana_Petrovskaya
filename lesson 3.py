@@ -96,3 +96,67 @@ def generate_all_headers(respondents_list):
 
 
 generate_all_headers(respondents)
+
+def get_and_validate_inn() -> bool:
+    """
+    Запрашивает ИНН у пользователя и проверяет его валидность.
+    Возвращает True, если ИНН корректен, иначе False.
+    """
+    inn_str = input("Введите ИНН (10 или 12 цифр): ").strip()
+
+    if not inn_str.isdigit():
+        print("Ошибка: ИНН должен содержать только цифры.")
+        return False
+
+    inn = [int(c) for c in inn_str]
+    length = len(inn)
+
+    if length == 10:
+        is_valid = _validate_inn_10(inn)
+    elif length == 12:
+        is_valid = _validate_inn_12(inn)
+    else:
+        print("Ошибка: ИНН должен быть длиной 10 или 12 цифр.")
+        return False
+
+    if is_valid:
+        print("ИНН корректен.")
+    else:
+        print("Ошибка: Неверное контрольное число.")
+    return is_valid
+
+
+def _validate_inn_10(inn: list[int]) -> bool:
+    """Проверка 10-значного ИНН."""
+    coefficients = [2, 4, 10, 3, 5, 9, 4, 6, 8]
+    control_sum = sum(coef * num for coef, num in zip(coefficients, inn[:9]))
+    control_number = control_sum % 11
+    if control_number > 9:
+        control_number %= 10
+    return control_number == inn[9]
+
+
+def _validate_inn_12(inn: list[int]) -> bool:
+    """Проверка 12-значного ИНН."""
+    # Проверка первого контрольного числа (11-я цифра)
+    coefficients_1 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8]
+    control_sum_1 = sum(coef * num for coef, num in zip(coefficients_1, inn[:10]))
+    control_number_1 = control_sum_1 % 11
+    if control_number_1 > 9:
+        control_number_1 %= 10
+    if control_number_1 != inn[10]:
+        return False
+
+    # Проверка второго контрольного числа (12-я цифра)
+    coefficients_2 = [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8]
+    control_sum_2 = sum(coef * num for coef, num in zip(coefficients_2, inn[:11]))
+    control_number_2 = control_sum_2 % 11
+    if control_number_2 > 9:
+        control_number_2 %= 10
+    return control_number_2 == inn[11]
+
+
+# Пример использования
+if __name__ == "__main__":
+    is_valid = get_and_validate_inn()
+    print("Результат проверки:", is_valid)
