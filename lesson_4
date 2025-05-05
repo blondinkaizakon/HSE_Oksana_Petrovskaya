@@ -69,3 +69,55 @@ with open(output_path, "w", encoding="utf-8") as f:
     json.dump(result, f, ensure_ascii=False, indent=2)
 
 print(f"✅ Найдено {len(result)} ИНН с email-адресами. Результат сохранён в {output_path}")
+
+import re
+import json
+import json
+import re
+
+# 🔹 Укажите путь к вашему ICS-файлу
+input_path = r"C:\Users\OX\Desktop\LP\RAD_09_04_2024.ics"
+output_path = r"C:\Users\OX\Desktop\LP\court_dates1.json"
+
+case_number = "А40-183194/2015"
+events = []
+event = {}
+inside_event = False
+
+with open(input_path, "r", encoding="utf-8") as file:
+    for line in file:
+        line = line.strip()
+
+        if line == "BEGIN:VEVENT":
+            inside_event = True
+            event = {}
+        elif line == "END:VEVENT":
+            inside_event = False
+            # Пропускаем события без даты или места
+            if event.get("DTSTART", "").startswith("00010101") or "LOCATION" not in event:
+                continue
+
+            def parse_dt(value):
+                if value.startswith("TZID=UTC+3:"):
+                    value = value.replace("TZID=UTC+3:", "")
+                if "T" in value:
+                    return f"{value[:4]}-{value[4:6]}-{value[6:8]}T{value[9:11]}:{value[11:13]}:00+03:00"
+                return ""
+
+            events.append({
+                "case_number": case_number,
+                "start": parse_dt(event.get("DTSTART", "")),
+                "end": parse_dt(event.get("DTEND", "")),
+                "location": event.get("LOCATION", "").replace("\\,", ",").replace("\\n", " ").strip(),
+                "description": event.get("DESCRIPTION", "").replace("\\n", "\n").replace("\\,", ",").strip()
+            })
+        elif inside_event and ":" in line:
+            key, value = line.split(":", 1)
+            key = key.split(";")[0].strip().upper()
+            event[key] = value.strip()
+
+# 🔹 Сохраняем в JSON
+with open(output_path, "w", encoding="utf-8") as out_file:
+    json.dump(events, out_file, ensure_ascii=False, indent=2)
+
+print(f"✅ Найдено {len(events)} заседаний. Данные сохранены в {output_path}")
