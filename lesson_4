@@ -15,8 +15,8 @@ filtered_data = []
 for org in data:
     if org.get("ИНН") in inn_list:
         filtered_data.append({
-            "ИНН": org.get("ИНН", ""),
-            "ОГРН": org.get("ОГРН", ""),
+            "ИНН": org.get("inn", ""),
+            "ОГРН": org.get("ogrn", ""),
             "Адрес": org.get("Адрес", "")
         })
 
@@ -38,9 +38,24 @@ import json
 import re
 from collections import defaultdict
 
+from pathlib import Path
+
+# Универсальная папка Desktop
+desktop_dir = Path.home() / 'Desktop'
+
 # Путь к входному файлу
-input_path = r"C:\Users\OX\Desktop\LP\100000_efrsb_messages.json"
-output_path = r"C:\Users\OX\Desktop\emails.json"
+input_path = desktop_dir / 'LP' / '100000_efrsb_messages.json'
+
+# Путь к файлу с результатами
+output_path = desktop_dir / 'emails.json'
+
+# Пример использования:
+with input_path.open('r', encoding='utf-8') as infile:
+    data = infile.read()
+    # ... обработка данных ...
+
+with output_path.open('w', encoding='utf-8') as outfile:
+    outfile.write('ваши результаты')
 
 # Регулярное выражение для email-адресов
 email_pattern = re.compile(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+')
