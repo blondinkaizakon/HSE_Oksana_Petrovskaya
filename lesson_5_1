@@ -1,0 +1,123 @@
+# 1. Сначала — определение класса
+class CourtCase:
+    def __init__(self, case_number):
+        self.case_number = case_number
+        self.case_participants = []
+        self.listening_datetimes = []
+        self.is_finished = False
+        self.verdict = ""
+        self.log = []
+
+    def _log_action(self, message):
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.log.append(f"[{timestamp}] {message}")
+
+    def _validate_inn(self, inn):
+        inn = str(inn).strip()
+        if len(inn) not in (10, 12):
+            self._log_action(f"Попытка использовать невалидный ИНН: {inn} (длина не 10 и не 12)")
+            return False
+        if not inn.isdigit():
+            self._log_action(f"Попытка использовать невалидный ИНН: {inn} (содержит не только цифры)")
+            return False
+        return True
+
+    def set_a_listening_datetime(self, datetime_str, location="", description=""):
+        listening = {
+            "datetime": datetime_str,
+            "location": location,
+            "description": description
+        }
+        self.listening_datetimes.append(listening)
+        message = f"Добавлено заседание: {datetime_str} в {location or 'не указано'}"
+        print(message)
+        self._log_action(message)
+
+    def add_participant(self, inn):
+        inn = str(inn).strip()
+        if not self._validate_inn(inn):
+            print(f"❌ Ошибка: ИНН '{inn}' не прошёл проверку (должен быть 10 или 12 цифр).")
+            return
+
+        if inn not in self.case_participants:
+            self.case_participants.append(inn)
+            message = f"Участник {inn} добавлен в дело {self.case_number}."
+            print(f"✅ {message}")
+            self._log_action(message)
+        else:
+            message = f"Участник {inn} уже есть в деле."
+            print(f"ℹ️ {message}")
+            self._log_action(message)
+
+    def remove_participant(self, inn):
+        inn = str(inn).strip()
+        if inn in self.case_participants:
+            self.case_participants.remove(inn)
+            message = f"Участник {inn} удалён из дела {self.case_number}."
+            print(f"✅ {message}")
+            self._log_action(message)
+        else:
+            message = f"Участник {inn} не найден в деле."
+            print(f"⚠️ {message}")
+            self._log_action(message)
+
+    def make_a_decision(self, verdict_text):
+        if not self.is_finished:
+            self.verdict = verdict_text
+            self.is_finished = True
+            message = f"По делу {self.case_number} вынесено решение: {verdict_text}"
+            print(f"⚖️ {message}")
+            self._log_action(message)
+        else:
+            message = "Решение уже вынесено. Изменить нельзя."
+            print(f"❌ {message}")
+            self._log_action(message)
+
+    def get_case_info(self):
+        print("\n" + "="*60)
+        print(f"📄 СУДЕБНОЕ ДЕЛО №{self.case_number}".center(60))
+        print("="*60)
+        print(f"🔹 Статус дела: {'Завершено' if self.is_finished else 'В производстве'}")
+        print(f"🔹 Решение: {self.verdict if self.verdict else 'Не вынесено'}")
+        print()
+
+        print("👥 УЧАСТНИКИ:")
+        if self.case_participants:
+            for inn in self.case_participants:
+                print(f"   • {inn}")
+        else:
+            print("   (нет участников)")
+
+        print("\n📅 ЗАСЕДАНИЯ:")
+        if self.listening_datetimes:
+            for i, listening in enumerate(self.listening_datetimes, 1):
+                dt = listening['datetime']
+                loc = listening['location'] or "—"
+                desc = listening['description'] or "—"
+                print(f"   {i}. {dt} | Место: {loc} | Повестка: {desc}")
+        else:
+            print("   (заседания не назначены)")
+
+        print("\n📝 ЛОГ ДЕЙСТВИЙ:")
+        for entry in self.log:
+            print(f"   {entry}")
+
+        print("="*60)
+
+
+# 2. Пример использования
+if __name__ == "__main__":
+    case = CourtCase("А40-123456/2025")
+
+    case.add_participant("7701234567")
+    case.add_participant("123456789012")
+    case.add_participant("123")
+    case.add_participant("abc123")
+
+    case.set_a_listening_datetime("2025-04-15 10:00", "Зал №5", "Предварительное слушание")
+    case.set_a_listening_datetime("2025-05-03 14:30", "Зал №5", "Рассмотрение по существу")
+
+    case.make_a_decision("В удовлетворении иска отказать.")
+
+    case.get_case_info()
