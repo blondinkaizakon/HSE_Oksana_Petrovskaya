@@ -1,0 +1,228 @@
+import logging
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
+# --- Настройка логирования ---
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# --- Константы ---
+BOT_TOKEN = "7263502491:AAEyUdhs9ibx1DfYwoE-NbzGO40tFj76Hes"  
+
+# --- Тексты ---
+TEXTS = {
+    "start_new": "🌟 Привет! Я чат-бот ЛегалФлоу, и я здесь, чтобы помочь вам с юридическими вопросами. Вы здесь впервые или уже знакомы с нами? Давайте начнем!",
+    "start_returning": "👋 С возвращением! Рад снова помочь вам с юридическими вопросами. Чем могу быть полезен?",
+    "main_menu": "📋 Выберите, что вам нужно:",
+    "services_overview": (
+        "💼 Мы специализируемся на юридическом сопровождении бизнеса. Вот краткий обзор наших услуг:\n\n"
+        "🔍 <b>Правовой аудит:</b> Проверим ваш бизнес на наличие юридических рисков и предложим решения.\n\n"
+        "⚖️ <b>Представление интересов в судах и госорганах:</b> Защитим ваши интересы в судебных и административных процедурах.\n\n"
+        "🤖 <b>Легалтек решения:</b> Используем передовые технологии для оптимизации юридических процессов в вашем бизнесе.\n\n"
+        "Выберите услугу, которую хотите узнать подробнее, или напишите \"Консультация\", чтобы записаться на бесплатную консультацию с нашим экспертом!"
+    ),
+    "audit_details": (
+        "🔍 Правовой аудит — это отличный способ выявить потенциальные риски и улучшить юридическую безопасность вашего бизнеса. "
+        "Мы проведем тщательный анализ ваших документов, договоров и внутренних процессов.\n\n"
+        "💰 Стоимость правового аудита в ЛегалФлоу начинается от 50 000 рублей. "
+        "Готовы заказать или хотите бесплатную консультацию, чтобы узнать больше? Напишите \"Заказать\" или \"Консультация\"."
+    ),
+    "request_status_prompt": "🔢 Пожалуйста, укажите номер вашего запроса или кратко опишите его, и я проверю статус для вас.",
+    "consultation_prompt": "📞 Отличный выбор! Пожалуйста, укажите ваше имя и номер телефона, и мы свяжемся с вами в ближайшее время для записи на консультацию.",
+    "humor_response_day": "🌞 Сегодня отличный день для решения юридических вопросов! Если вам нужна помощь, я всегда здесь.",
+    "humor_response_pizza": "🍕 Конечно, можно! Главное, чтобы это не привело к юридическим проблемам, связанным с нарушением диеты. 😄",
+    "humor_response_how_not_trouble": (
+        "🛡️ Отличный вопрос! Вот где мы можем помочь. "
+        "Наша команда специализируется на предотвращении юридических рисков. "
+        "Запишитесь на бесплатную консультацию, и мы расскажем, как избежать неприятностей с законом."
+    ),
+    "goodbye": "🤗 Если у вас больше нет вопросов, не забывайте, что мы всегда здесь, чтобы помочь. До скорой встречи!",
+    "special_offer": (
+        "🎁 Кстати, у нас есть специальное предложение для новых клиентов: "
+        "<a href='https://your-link-to-checklist.com'>чек-лист как ответить на претензию за 5 шагов</a>! Не пропустите!\n\n"
+        "📋 Хотите быть готовы к любой претензии? Наш чек-лист поможет вам ответить на претензию быстро и эффективно. Вот что вы получите:\n\n"
+        "1️⃣ Шаг 1: Оцените претензию и определите основные пункты.\n"
+        "2️⃣ Шаг 2: Соберите все необходимые документы и доказательства.\n"
+        "3️⃣ Шаг 3: Составьте грамотный ответ, следуя юридическим нормам.\n"
+        "4️⃣ Шаг 4: Отправьте ответ в установленный срок.\n"
+        "5️⃣ Шаг 5: Готовьтесь к возможному судебному разбирательству."
+    ),
+    "unknown_command": "🤔 Извините, я не понимаю эту команду. Пожалуйста, используйте меню или напишите \"Меню\", чтобы вернуться к основным опциям.",
+    "unknown_message": "🤔 Я не совсем понял ваш запрос. Могу ли я чем-нибудь помочь из меню?"
+}
+
+# --- Клавиатуры ---
+MAIN_MENU_KEYBOARD = [
+    [KeyboardButton("💼 Узнать о наших услугах")],
+    [KeyboardButton("📅 Записаться на консультацию")],
+    [KeyboardButton("❓ Узнать о статусе запроса")],
+    [KeyboardButton("📬 Другое (напишите ваш вопрос)")],
+    [KeyboardButton("🎁 Специальное предложение")]
+]
+
+SERVICES_KEYBOARD = [
+    [KeyboardButton("🔍 Правовой аудит")],
+    [KeyboardButton("⚖️ Суды и госорганы")],
+    [KeyboardButton("🤖 Легалтек")],
+    [KeyboardButton("📞 Консультация")],
+    [KeyboardButton("⬅️ Назад")]
+]
+
+BACK_KEYBOARD = [[KeyboardButton("⬅️ Назад")]]
+
+# --- Обработчики ---
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отправляет приветственное сообщение."""
+    user = update.effective_user
+    logger.info(f"Пользователь {user.first_name} ({user.id}) начал диалог.")
+    
+    # Простая проверка "новый/старый" пользователь (в реальном боте это хранилось бы в БД)
+    # Для примера: если пользователь уже писал, считаем его "старым"
+    if context.user_data.get("has_interacted"):
+        greeting = TEXTS["start_returning"]
+    else:
+        greeting = TEXTS["start_new"]
+        context.user_data["has_interacted"] = True
+
+    await update.message.reply_text(
+        greeting,
+        reply_markup=ReplyKeyboardMarkup(MAIN_MENU_KEYBOARD, resize_keyboard=True)
+    )
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает главное меню."""
+    await update.message.reply_text(
+        TEXTS["main_menu"],
+        reply_markup=ReplyKeyboardMarkup(MAIN_MENU_KEYBOARD, resize_keyboard=True),
+        parse_mode="HTML"
+    )
+
+async def handle_services_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает запрос 'Узнать о наших услугах'."""
+    await update.message.reply_text(
+        TEXTS["services_overview"],
+        reply_markup=ReplyKeyboardMarkup(SERVICES_KEYBOARD, resize_keyboard=True),
+        parse_mode="HTML"
+    )
+
+async def handle_audit_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает запрос 'Правовой аудит'."""
+    await update.message.reply_text(
+        TEXTS["audit_details"],
+        reply_markup=ReplyKeyboardMarkup(BACK_KEYBOARD, resize_keyboard=True),
+        parse_mode="HTML"
+    )
+
+async def handle_consultation_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает запрос 'Записаться на консультацию'."""
+    await update.message.reply_text(
+        TEXTS["consultation_prompt"],
+        reply_markup=ReplyKeyboardMarkup(BACK_KEYBOARD, resize_keyboard=True)
+    )
+
+async def handle_request_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает запрос 'Узнать о статусе запроса'."""
+    await update.message.reply_text(
+        TEXTS["request_status_prompt"],
+        reply_markup=ReplyKeyboardMarkup(BACK_KEYBOARD, resize_keyboard=True)
+    )
+
+async def handle_special_offer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает запрос 'Специальное предложение'."""
+    await update.message.reply_text(
+        TEXTS["special_offer"],
+        reply_markup=ReplyKeyboardMarkup(MAIN_MENU_KEYBOARD, resize_keyboard=True),
+        parse_mode="HTML",
+        disable_web_page_preview=False
+    )
+
+async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает кнопку 'Назад'."""
+    await show_main_menu(update, context)
+
+async def handle_other_question(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает 'Другое (напишите ваш вопрос)'."""
+    user_question = update.message.text
+    logger.info(f"Пользователь задал вопрос: {user_question}")
+    # Здесь можно добавить логику для обработки вопроса, например, отправку в группу поддержки
+    await update.message.reply_text(
+        "📩 Спасибо за ваш вопрос! Наши специалисты свяжутся с вами в ближайшее время.",
+        reply_markup=ReplyKeyboardMarkup(MAIN_MENU_KEYBOARD, resize_keyboard=True)
+    )
+
+async def handle_humor_or_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает юмористические и общие вопросы."""
+    user_message = update.message.text.lower()
+
+    if "какой сегодня день" in user_message or "какой день" in user_message:
+        response = TEXTS["humor_response_day"]
+    elif "можно ли есть пиццу" in user_message or "пицца на завтрак" in user_message:
+        response = TEXTS["humor_response_pizza"]
+    elif "как мне не попасть в неприятности" in user_message or "не попасть в неприятности" in user_message:
+        response = TEXTS["humor_response_how_not_trouble"]
+    else:
+        response = TEXTS["unknown_message"]
+
+    await update.message.reply_text(
+        response,
+        reply_markup=ReplyKeyboardMarkup(MAIN_MENU_KEYBOARD, resize_keyboard=True),
+        parse_mode="HTML"
+    )
+
+async def handle_goodbye(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает завершение диалога."""
+    await update.message.reply_text(
+        TEXTS["goodbye"],
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает неизвестные команды."""
+    await update.message.reply_text(
+        TEXTS["unknown_command"],
+        reply_markup=ReplyKeyboardMarkup(MAIN_MENU_KEYBOARD, resize_keyboard=True)
+    )
+
+
+def main() -> None:
+    """Запуск бота."""
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # Обработчики команд
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("menu", show_main_menu))
+    application.add_handler(CommandHandler("stop", handle_goodbye))
+
+    # Обработчики сообщений с кнопок меню
+    application.add_handler(MessageHandler(filters.Regex("^💼 Узнать о наших услугах$"), handle_services_menu))
+    application.add_handler(MessageHandler(filters.Regex("^🔍 Правовой аудит$"), handle_audit_details))
+    application.add_handler(MessageHandler(filters.Regex("^⚖️ Суды и госорганы$"), lambda u, c: u.message.reply_text("Информация о представлении интересов в судах и госорганах. (Заглушка)", reply_markup=ReplyKeyboardMarkup(BACK_KEYBOARD, resize_keyboard=True))))
+    application.add_handler(MessageHandler(filters.Regex("^🤖 Легалтек$"), lambda u, c: u.message.reply_text("Информация о легалтек решениях. (Заглушка)", reply_markup=ReplyKeyboardMarkup(BACK_KEYBOARD, resize_keyboard=True))))
+    application.add_handler(MessageHandler(filters.Regex("^📞 Консультация$"), handle_consultation_request))
+    application.add_handler(MessageHandler(filters.Regex("^📅 Записаться на консультацию$"), handle_consultation_request))
+    application.add_handler(MessageHandler(filters.Regex("^❓ Узнать о статусе запроса$"), handle_request_status))
+    application.add_handler(MessageHandler(filters.Regex("^📬 Другое.*$"), handle_other_question))
+    application.add_handler(MessageHandler(filters.Regex("^🎁 Специальное предложение$"), handle_special_offer))
+    application.add_handler(MessageHandler(filters.Regex("^⬅️ Назад$"), handle_back))
+
+    # Обработчики юмора и общих вопросов
+    humor_filters = filters.Regex("(?i)(какой.*день|можно.*пицц|пицца.*завтрак|не.*попасть.*неприятности)")
+    application.add_handler(MessageHandler(humor_filters, handle_humor_or_questions))
+
+    # Обработчик неизвестных команд
+    application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+
+    # Обработчик текстовых сообщений (после всех специфичных обработчиков)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_humor_or_questions))
+
+    # Запуск бота
+    logger.info("Бот запущен...")
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()
