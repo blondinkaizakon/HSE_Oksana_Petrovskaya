@@ -1,1 +1,166 @@
+-- Создание базы данных
+CREATE DATABASE IF NOT EXISTS judicial_system;
+USE judicial_system;
 
+--  Судебные округа
+CREATE TABLE districts (
+    district_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    region VARCHAR(100)
+);
+
+--  Судьи
+CREATE TABLE judges (
+    judge_id INT PRIMARY KEY AUTO_INCREMENT,
+    full_name VARCHAR(255) NOT NULL,
+    district_id INT NOT NULL,
+    hire_date DATE NOT NULL,
+    FOREIGN KEY (district_id) REFERENCES districts(district_id)
+);
+
+--  Физические лица
+CREATE TABLE individuals (
+    individual_id INT PRIMARY KEY AUTO_INCREMENT,
+    full_name VARCHAR(255) NOT NULL,
+    birth_date DATE,
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_individual_phone_email (phone, email)
+);
+
+--  Юридические лица
+CREATE TABLE legal_entities (
+    entity_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    inn VARCHAR(12) UNIQUE,
+    ogrn VARCHAR(15) UNIQUE,
+    address TEXT
+);
+
+-- Категории дел
+CREATE TABLE case_categories (
+    category_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT
+);
+
+--  Роли участников
+CREATE TABLE participant_roles (
+    role_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+-- Судебные дела
+CREATE TABLE cases (
+    case_id INT PRIMARY KEY AUTO_INCREMENT,
+    case_number VARCHAR(50) NOT NULL UNIQUE,
+    category_id INT NOT NULL,
+    district_id INT NOT NULL,
+    judge_id INT,
+    status ENUM('в рассмотрении', 'завершено', 'закрыто', 'снято') DEFAULT 'в рассмотрении',
+    open_date DATE NOT NULL,
+    close_date DATE,
+    result ENUM('удовлетворено', 'отказано', 'частично удовлетворено', 'без решения') NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CHECK (open_date <= COALESCE(close_date, open_date)),
+    FOREIGN KEY (category_id) REFERENCES case_categories(category_id),
+    FOREIGN KEY (district_id) REFERENCES districts(district_id),
+    FOREIGN KEY (judge_id) REFERENCES judges(judge_id)
+);
+
+--  Участники дела
+CREATE TABLE case_participants (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    case_id INT NOT NULL,
+    individual_id INT NULL,
+    entity_id INT NULL,
+    role_id INT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE,
+    FOREIGN KEY (individual_id) REFERENCES individuals(individual_id) ON DELETE CASCADE,
+    FOREIGN KEY (entity_id) REFERENCES legal_entities(entity_id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES participant_roles(role_id),
+    UNIQUE KEY uk_case_participant_role (case_id, individual_id, entity_id, role_id)
+);
+
+--  Документы по делу
+CREATE TABLE documents (
+    document_id INT PRIMARY KEY AUTO_INCREMENT,
+    case_id INT NOT NULL,
+    judge_id INT,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    issue_date DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE,
+    FOREIGN KEY (judge_id) REFERENCES judges(judge_id)
+);
+
+-- Тестовые данные
+INSERT INTO districts (name, region) VALUES 
+('Московский', 'Москва'),
+('Санкт-Петербургский', 'СПб');
+
+INSERT INTO judges (full_name, district_id, hire_date) VALUES 
+('Иванова А.Б.', 1, '2020-03-15'),
+('Петров С.В.', 2, '2018-07-22');
+
+INSERT INTO case_categories (name) VALUES 
+('Гражданские'),
+('Арбитражные');
+
+INSERT INTO participant_roles (name) VALUES 
+('истец'),
+('ответчик'),
+('адвокат истца'),
+('адвокат ответчика');
+
+INSERT INTO individuals (full_name, birth_date, phone, email) VALUES 
+('Сидоров Пётр Алексеевич', '1985-03-12', '+79051234567', 'sidorov@example.com');
+
+INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, status) VALUES 
+('А40-123456/2024', 1, 1, 1, '2024-01-10', 'завершено');
+
+INSERT INTO case_participants (case_id, individual_id, role_id) VALUES 
+(1, 1, 1);  -- Сидоров П.А. как истец в деле А40-123456/2024
+
+-- Примеры запросов
+-- Дела конкретного судьи
+SELECT c.case_number, j.full_name 
+FROM cases c
+JOIN judges j ON c.judge_id = j.judge_id
+WHERE j.full_name = 'Иванова А.Б.';
+
+-- Дела конкретного физического лица
+SELECT c.case_number, pr.name AS role, i.full_name
+FROM cases c
+JOIN case_participants cp ON c.case_id = cp.case_id
+JOIN individuals i ON cp.individual_id = i.individual_id
+JOIN participant_roles pr ON cp.role_id = pr.role_id
+WHERE i.full_name = 'Сидоров Пётр Алексеевич';
+
+-- Средняя продолжительность дел судьи
+SELECT 
+    j.full_name,
+    AVG(DATEDIFF(c.close_date, c.open_date)) AS avg_days
+FROM cases c
+JOIN judges j ON c.judge_id = j.judge_id
+WHERE c.status = 'завершено' AND c.close_date IS NOT NULL
+GROUP BY j.judge_id;
+
+--  Обновление контактов
+UPDATE individuals 
+SET email = 'new@example.com'
+WHERE full_name = 'Сидоров Пётр Алексеевич';
+
+--  Рейтинг судей по количеству дел
+SELECT 
+    j.full_name,
+    COUNT(*) AS total_cases
+FROM judges j
+JOIN cases c ON j.judge_id = c.judge_id
+WHERE c.status = 'завершено'
+GROUP BY j.judge_id
+ORDER BY total_cases DESC;
