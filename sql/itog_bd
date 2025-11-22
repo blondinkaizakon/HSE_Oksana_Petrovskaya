@@ -1,15 +1,22 @@
+/*
+ * Проект: База данных судебной системы
+ * Автор: Оксана Петровская
+ * Версия: 1.0
+ * Описание: Полная схема БД для учёта дел, участников, документов и статистики
+ */
+
 -- Создание базы данных
 CREATE DATABASE IF NOT EXISTS judicial_system;
 USE judicial_system;
 
---  Судебные округа
+-- Судебные округа
 CREATE TABLE districts (
     district_id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL UNIQUE,
     region VARCHAR(100)
 );
 
---  Судьи
+-- Судьи
 CREATE TABLE judges (
     judge_id INT PRIMARY KEY AUTO_INCREMENT,
     full_name VARCHAR(255) NOT NULL,
@@ -18,7 +25,7 @@ CREATE TABLE judges (
     FOREIGN KEY (district_id) REFERENCES districts(district_id)
 );
 
---  Физические лица
+-- Физические лица
 CREATE TABLE individuals (
     individual_id INT PRIMARY KEY AUTO_INCREMENT,
     full_name VARCHAR(255) NOT NULL,
@@ -30,7 +37,7 @@ CREATE TABLE individuals (
     UNIQUE KEY uk_individual_phone_email (phone, email)
 );
 
---  Юридические лица
+-- Юридические лица
 CREATE TABLE legal_entities (
     entity_id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -46,7 +53,7 @@ CREATE TABLE case_categories (
     description TEXT
 );
 
---  Роли участников
+-- Роли участников
 CREATE TABLE participant_roles (
     role_id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(50) NOT NULL UNIQUE
@@ -71,7 +78,7 @@ CREATE TABLE cases (
     FOREIGN KEY (judge_id) REFERENCES judges(judge_id)
 );
 
---  Участники дела
+-- Участники дела
 CREATE TABLE case_participants (
     id INT PRIMARY KEY AUTO_INCREMENT,
     case_id INT NOT NULL,
@@ -85,7 +92,7 @@ CREATE TABLE case_participants (
     UNIQUE KEY uk_case_participant_role (case_id, individual_id, entity_id, role_id)
 );
 
---  Документы по делу
+-- Документы по делу
 CREATE TABLE documents (
     document_id INT PRIMARY KEY AUTO_INCREMENT,
     case_id INT NOT NULL,
@@ -118,22 +125,24 @@ INSERT INTO participant_roles (name) VALUES
 ('адвокат ответчика');
 
 INSERT INTO individuals (full_name, birth_date, phone, email) VALUES 
-('Сидоров Пётр Алексеевич', '1985-03-12', '+79051234567', 'sidorov@example.com');
+('Сидоров Пётр Алексеевич', '1985-03-12', '+79051234567', 'sidorov@example.com'),
+('Кузнецов Дмитрий Игоревич', '1990-08-22', '+79159876543', 'kuznetsov@example.com');
 
-INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, status) VALUES 
-('А40-123456/2024', 1, 1, 1, '2024-01-10', 'завершено');
+INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, close_date, status, result) VALUES 
+('А40-123456/2024', 1, 1, 1, '2024-01-10', '2024-03-15', 'завершено', 'удовлетворено'),
+('А40-123457/2024', 1, 1, 1, '2024-02-01', '2024-04-10', 'завершено', 'отказано'),
+('А40-123458/2024', 2, 2, 2, '2024-05-05', NULL, 'в рассмотрении', NULL);
 
 INSERT INTO case_participants (case_id, individual_id, role_id) VALUES 
-(1, 1, 1);  -- Сидоров П.А. как истец в деле А40-123456/2024
+(1, 1, 1),  -- Сидоров — истец в деле 1
+(1, 2, 2),  -- Кузнецов — ответчик в деле 1
+(2, 1, 1);  -- Сидоров — истец в деле 2
 
--- Примеры запросов
--- Дела конкретного судьи
-SELECT c.case_number, j.full_name 
-FROM cases c
-JOIN judges j ON c.judge_id = j.judge_id
-WHERE j.full_name = 'Иванова А.Б.';
+-- ===========================================================================
+-- ЗАПРОСЫ
+-- ===========================================================================
 
--- Дела конкретного физического лица
+-- 1. Список дел, в которых участвует определённое лицо (физ.)
 SELECT c.case_number, pr.name AS role, i.full_name
 FROM cases c
 JOIN case_participants cp ON c.case_id = cp.case_id
@@ -141,7 +150,13 @@ JOIN individuals i ON cp.individual_id = i.individual_id
 JOIN participant_roles pr ON cp.role_id = pr.role_id
 WHERE i.full_name = 'Сидоров Пётр Алексеевич';
 
--- Средняя продолжительность дел судьи
+-- 2. Список дел, над которыми работает конкретный судья
+SELECT c.case_number, j.full_name, c.open_date
+FROM cases c
+JOIN judges j ON c.judge_id = j.judge_id
+WHERE j.full_name = 'Иванова А.Б.';
+
+-- 3. Средняя продолжительность рассмотрения дел судьёй
 SELECT 
     j.full_name,
     AVG(DATEDIFF(c.close_date, c.open_date)) AS avg_days
@@ -150,12 +165,7 @@ JOIN judges j ON c.judge_id = j.judge_id
 WHERE c.status = 'завершено' AND c.close_date IS NOT NULL
 GROUP BY j.judge_id;
 
---  Обновление контактов
-UPDATE individuals 
-SET email = 'new@example.com'
-WHERE full_name = 'Сидоров Пётр Алексеевич';
-
---  Рейтинг судей по количеству дел
+-- 4. Рейтинг судей по количеству рассмотренных дел
 SELECT 
     j.full_name,
     COUNT(*) AS total_cases
@@ -164,3 +174,121 @@ JOIN cases c ON j.judge_id = c.judge_id
 WHERE c.status = 'завершено'
 GROUP BY j.judge_id
 ORDER BY total_cases DESC;
+
+-- 5. Судьи, рассмотревшие >1 дела за последний год
+SELECT 
+    j.full_name,
+    COUNT(*) AS cases_last_year
+FROM judges j
+JOIN cases c ON j.judge_id = c.judge_id
+WHERE c.open_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+GROUP BY j.judge_id
+HAVING COUNT(*) > 1;
+
+-- 6. Юрлица, выигравшие >50% дел по категории (пример для физ. лиц, т.к. юрлица не вставлены)
+WITH plaintiff_stats AS (
+    SELECT 
+        i.full_name,
+        cc.name AS category,
+        COUNT(*) AS total,
+        SUM(CASE WHEN c.result = 'удовлетворено' THEN 1 ELSE 0 END) AS wins
+    FROM cases c
+    JOIN case_participants cp ON c.case_id = cp.case_id
+    JOIN individuals i ON cp.individual_id = i.individual_id
+    JOIN case_categories cc ON c.category_id = cc.category_id
+    JOIN participant_roles pr ON cp.role_id = pr.role_id
+    WHERE pr.name = 'истец'
+    GROUP BY i.individual_id, cc.category_id
+)
+SELECT 
+    full_name,
+    category,
+    total,
+    wins,
+    ROUND(wins / total * 100, 1) AS win_rate_percent
+FROM plaintiff_stats
+WHERE total >= 2 AND wins / total > 0.5;
+
+-- 7. Категории с наибольшим % неудачных исходов
+SELECT 
+    cc.name AS category,
+    COUNT(*) AS total,
+    SUM(CASE WHEN c.result = 'отказано' THEN 1 ELSE 0 END) AS denied,
+    ROUND(SUM(CASE WHEN c.result = 'отказано' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) AS deny_rate_percent
+FROM cases c
+JOIN case_categories cc ON c.category_id = cc.category_id
+WHERE c.status = 'завершено'
+GROUP BY cc.category_id
+ORDER BY deny_rate_percent DESC;
+
+-- 8. Физлица, выигравшие все свои дела, и судьи этих дел
+WITH perfect_winners AS (
+    SELECT 
+        i.individual_id,
+        i.full_name,
+        COUNT(*) AS total_cases
+    FROM cases c
+    JOIN case_participants cp ON c.case_id = cp.case_id
+    JOIN individuals i ON cp.individual_id = i.individual_id
+    JOIN participant_roles pr ON cp.role_id = pr.role_id
+    WHERE pr.name = 'истец' AND c.status = 'завершено'
+    GROUP BY i.individual_id
+    HAVING SUM(CASE WHEN c.result = 'удовлетворено' THEN 1 ELSE 0 END) = COUNT(*)
+      AND COUNT(*) >= 1
+)
+SELECT 
+    pw.full_name AS plaintiff,
+    j.full_name AS judge,
+    c.case_number
+FROM perfect_winners pw
+JOIN case_participants cp ON pw.individual_id = cp.individual_id
+JOIN cases c ON cp.case_id = c.case_id
+JOIN judges j ON c.judge_id = j.judge_id
+WHERE c.result = 'удовлетворено';
+
+-- 9. Динамика количества дел по категориям за периоды
+SELECT 
+    cc.name AS category,
+    YEAR(c.open_date) AS year,
+    COUNT(*) AS cases_count
+FROM cases c
+JOIN case_categories cc ON c.category_id = cc.category_id
+WHERE c.open_date >= '2024-01-01'
+GROUP BY cc.category_id, YEAR(c.open_date)
+ORDER BY category, year;
+
+-- 10. Судебные округа с лучшей статистикой по категории (по % удовлетворённых)
+SELECT 
+    d.name AS district,
+    cc.name AS category,
+    COUNT(*) AS total,
+    ROUND(AVG(CASE WHEN c.result = 'удовлетворено' THEN 1.0 ELSE 0 END) * 100, 1) AS satisfaction_rate
+FROM cases c
+JOIN districts d ON c.district_id = d.district_id
+JOIN case_categories cc ON c.category_id = cc.category_id
+WHERE c.status = 'завершено'
+GROUP BY d.district_id, cc.category_id
+HAVING total >= 1
+ORDER BY category, satisfaction_rate DESC;
+
+-- 11. Добавление нового участника (физ. лица)
+INSERT INTO individuals (full_name, birth_date, phone, email)
+VALUES ('Новиков Алексей Сергеевич', '1988-11-30', '+79261112233', 'novikov@example.com');
+
+-- 12. Обновление контактной информации участника по ФИО
+UPDATE individuals 
+SET email = 'sidorov.updated@example.com', phone = '+79998887766'
+WHERE full_name = 'Сидоров Пётр Алексеевич';
+
+-- 13. Удаление дела, закрытого/снятого с рассмотрения (пример удаления дела 2)
+DELETE FROM cases WHERE case_id = 2 AND status IN ('закрыто', 'снято');
+-- Примечание: ON DELETE CASCADE автоматически удалит записи в case_participants и documents
+
+-- 14. Добавление нового судебного документа
+INSERT INTO documents (case_id, judge_id, title, issue_date)
+VALUES (
+    1, 
+    (SELECT judge_id FROM cases WHERE case_id = 1),
+    'Решение суда',
+    CURDATE()
+);
