@@ -138,6 +138,9 @@ INSERT INTO case_participants (case_id, individual_id, role_id) VALUES
 (1, 2, 2),  -- Кузнецов — ответчик в деле 1
 (2, 1, 1);  -- Сидоров — истец в деле 2
 
+INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, status)
+VALUES ('А40-999999/2024', 1, 1, 1, '2024-06-01', 'закрыто');
+
 -- ===========================================================================
 -- ЗАПРОСЫ
 -- ===========================================================================
@@ -185,7 +188,7 @@ WHERE c.open_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
 GROUP BY j.judge_id
 HAVING COUNT(*) > 1;
 
--- 6. Юрлица, выигравшие >50% дел по категории (пример для физ. лиц, т.к. юрлица не вставлены)
+-- 6. Юрлица, выигравшие >50% дел
 WITH plaintiff_stats AS (
     SELECT 
         i.full_name,
