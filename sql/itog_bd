@@ -1,297 +1,391 @@
-/*
- * Проект: База данных судебной системы
- * Автор: Оксана Петровская
- * Версия: 1.0
- * Описание: Полная схема БД для учёта дел, участников, документов и статистики
- */
+mysql> CREATE DATABASE judicial_system;
+Query OK, 1 row affected (0,002 sec)
 
--- Создание базы данных
-CREATE DATABASE IF NOT EXISTS judicial_system;
-USE judicial_system;
+mysql> USE judicial_system;
+Database changed
+mysql> 
+mysql> -- 1. Создаём таблицы
+Query OK, 0 rows affected (0,000 sec)
 
--- Судебные округа
-CREATE TABLE districts (
-    district_id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    region VARCHAR(100)
-);
+mysql> CREATE TABLE districts (
+    ->     district_id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     name VARCHAR(100) NOT NULL UNIQUE,
+    ->     region VARCHAR(100)
+    -> );
+Query OK, 0 rows affected (0,005 sec)
 
--- Судьи
-CREATE TABLE judges (
-    judge_id INT PRIMARY KEY AUTO_INCREMENT,
-    full_name VARCHAR(255) NOT NULL,
-    district_id INT NOT NULL,
-    hire_date DATE NOT NULL,
-    FOREIGN KEY (district_id) REFERENCES districts(district_id)
-);
+mysql> 
+mysql> CREATE TABLE case_categories (
+    ->     category_id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     name VARCHAR(100) NOT NULL UNIQUE
+    -> );
+Query OK, 0 rows affected (0,004 sec)
 
--- Физические лица
-CREATE TABLE individuals (
-    individual_id INT PRIMARY KEY AUTO_INCREMENT,
-    full_name VARCHAR(255) NOT NULL,
-    birth_date DATE,
-    phone VARCHAR(20),
-    email VARCHAR(100),
-    address TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_individual_phone_email (phone, email)
-);
+mysql> 
+mysql> CREATE TABLE participant_roles (
+    ->     role_id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     name VARCHAR(50) NOT NULL UNIQUE
+    -> );
+Query OK, 0 rows affected (0,002 sec)
 
--- Юридические лица
-CREATE TABLE legal_entities (
-    entity_id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    inn VARCHAR(12) UNIQUE,
-    ogrn VARCHAR(15) UNIQUE,
-    address TEXT
-);
+mysql> 
+mysql> CREATE TABLE judges (
+    ->     judge_id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     full_name VARCHAR(255) NOT NULL,
+    ->     district_id INT NOT NULL,
+    ->     hire_date DATE NOT NULL,
+    ->     FOREIGN KEY (district_id) REFERENCES districts(district_id)
+    -> );
+Query OK, 0 rows affected (0,003 sec)
 
--- Категории дел
-CREATE TABLE case_categories (
-    category_id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT
-);
+mysql> 
+mysql> CREATE TABLE individuals (
+    ->     individual_id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     full_name VARCHAR(255) NOT NULL,
+    ->     birth_date DATE,
+    ->     phone VARCHAR(20),
+    ->     email VARCHAR(100),
+    ->     UNIQUE KEY uk (phone, email)
+    -> );
+Query OK, 0 rows affected (0,003 sec)
 
--- Роли участников
-CREATE TABLE participant_roles (
-    role_id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(50) NOT NULL UNIQUE
-);
+mysql> 
+mysql> CREATE TABLE cases (
+    ->     case_id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     case_number VARCHAR(50) NOT NULL UNIQUE,
+    ->     category_id INT NOT NULL,
+    ->     district_id INT NOT NULL,
+    ->     judge_id INT,
+    ->     status VARCHAR(20) DEFAULT 'в рассмотрении',
+    ->     open_date DATE NOT NULL,
+    ->     close_date DATE,
+    ->     result VARCHAR(50),
+    ->     FOREIGN KEY (category_id) REFERENCES case_categories(category_id),
+    ->     FOREIGN KEY (district_id) REFERENCES districts(district_id),
+    ->     FOREIGN KEY (judge_id) REFERENCES judges(judge_id)
+    -> );
+Query OK, 0 rows affected (0,003 sec)
 
--- Судебные дела
-CREATE TABLE cases (
-    case_id INT PRIMARY KEY AUTO_INCREMENT,
-    case_number VARCHAR(50) NOT NULL UNIQUE,
-    category_id INT NOT NULL,
-    district_id INT NOT NULL,
-    judge_id INT,
-    status ENUM('в рассмотрении', 'завершено', 'закрыто', 'снято') DEFAULT 'в рассмотрении',
-    open_date DATE NOT NULL,
-    close_date DATE,
-    result ENUM('удовлетворено', 'отказано', 'частично удовлетворено', 'без решения') NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CHECK (open_date <= COALESCE(close_date, open_date)),
-    FOREIGN KEY (category_id) REFERENCES case_categories(category_id),
-    FOREIGN KEY (district_id) REFERENCES districts(district_id),
-    FOREIGN KEY (judge_id) REFERENCES judges(judge_id)
-);
+mysql> 
+mysql> CREATE TABLE case_participants (
+    ->     id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     case_id INT NOT NULL,
+    ->     individual_id INT,
+    ->     role_id INT NOT NULL,
+    ->     FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE,
+    ->     FOREIGN KEY (individual_id) REFERENCES individuals(individual_id) ON DELETE CASCADE,
+    ->     FOREIGN KEY (role_id) REFERENCES participant_roles(role_id)
+    -> );
+Query OK, 0 rows affected (0,003 sec)
 
--- Участники дела
-CREATE TABLE case_participants (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    case_id INT NOT NULL,
-    individual_id INT NULL,
-    entity_id INT NULL,
-    role_id INT NOT NULL,
-    FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE,
-    FOREIGN KEY (individual_id) REFERENCES individuals(individual_id) ON DELETE CASCADE,
-    FOREIGN KEY (entity_id) REFERENCES legal_entities(entity_id) ON DELETE CASCADE,
-    FOREIGN KEY (role_id) REFERENCES participant_roles(role_id),
-    UNIQUE KEY uk_case_participant_role (case_id, individual_id, entity_id, role_id)
-);
+mysql> 
+mysql> CREATE TABLE documents (
+    ->     document_id INT PRIMARY KEY AUTO_INCREMENT,
+    ->     case_id INT NOT NULL,
+    ->     judge_id INT,
+    ->     title VARCHAR(255),
+    ->     issue_date DATE NOT NULL,
+    ->     FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE,
+    ->     FOREIGN KEY (judge_id) REFERENCES judges(judge_id)
+    -> );
+Query OK, 0 rows affected (0,003 sec)
+mysql> INSERT INTO districts (name, region) VALUES ('Московский', 'Москва');
+Query OK, 1 row affected (0,000 sec)
 
--- Документы по делу
-CREATE TABLE documents (
-    document_id INT PRIMARY KEY AUTO_INCREMENT,
-    case_id INT NOT NULL,
-    judge_id INT,
-    title VARCHAR(255) NOT NULL,
-    content TEXT,
-    issue_date DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE,
-    FOREIGN KEY (judge_id) REFERENCES judges(judge_id)
-);
+mysql> INSERT INTO case_categories (name) VALUES ('Гражданские');
+Query OK, 1 row affected (0,000 sec)
 
--- Тестовые данные
-INSERT INTO districts (name, region) VALUES 
-('Московский', 'Москва'),
-('Санкт-Петербургский', 'СПб');
+mysql> INSERT INTO participant_roles (name) VALUES ('истец'), ('ответчик');
+Query OK, 2 rows affected (0,000 sec)
+Records: 2  Duplicates: 0  Warnings: 0
 
-INSERT INTO judges (full_name, district_id, hire_date) VALUES 
-('Иванова А.Б.', 1, '2020-03-15'),
-('Петров С.В.', 2, '2018-07-22');
+mysql> INSERT INTO judges (full_name, district_id, hire_date) VALUES ('Иванова А.Б.', 1, '2020-03-15');
+Query OK, 1 row affected (0,000 sec)
 
-INSERT INTO case_categories (name) VALUES 
-('Гражданские'),
-('Арбитражные');
+mysql> INSERT INTO individuals (full_name, birth_date, phone, email) VALUES ('Сидоров П.А.', '1985-03-12', '+79051234567', 's@ex.ru');
+Query OK, 1 row affected (0,000 sec)
 
-INSERT INTO participant_roles (name) VALUES 
-('истец'),
-('ответчик'),
-('адвокат истца'),
-('адвокат ответчика');
+mysql> INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, close_date, status, result)
+    -> VALUES ('А40-123/2024', 1, 1, 1, '2024-01-10', '2024-03-15', 'завершено', 'удовлетворено');
+Query OK, 1 row affected (0,000 sec)
 
-INSERT INTO individuals (full_name, birth_date, phone, email) VALUES 
-('Сидоров Пётр Алексеевич', '1985-03-12', '+79051234567', 'sidorov@example.com'),
-('Кузнецов Дмитрий Игоревич', '1990-08-22', '+79159876543', 'kuznetsov@example.com');
+mysql> INSERT INTO case_participants (case_id, individual_id, role_id) VALUES (1, 1, 1);
+Query OK, 1 row affected (0,000 sec)
 
-INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, close_date, status, result) VALUES 
-('А40-123456/2024', 1, 1, 1, '2024-01-10', '2024-03-15', 'завершено', 'удовлетворено'),
-('А40-123457/2024', 1, 1, 1, '2024-02-01', '2024-04-10', 'завершено', 'отказано'),
-('А40-123458/2024', 2, 2, 2, '2024-05-05', NULL, 'в рассмотрении', NULL);
+mysql> INSERT INTO documents (case_id, judge_id, title, issue_date) VALUES (1, 1, 'Решение', '2024-03-15');
+Query OK, 1 row affected (0,001 sec)
 
-INSERT INTO case_participants (case_id, individual_id, role_id) VALUES 
-(1, 1, 1),  -- Сидоров — истец в деле 1
-(1, 2, 2),  -- Кузнецов — ответчик в деле 1
-(2, 1, 1);  -- Сидоров — истец в деле 2
+mysql> 
+mysql> -- 3. Проверка
+Query OK, 0 rows affected (0,000 sec)
 
-INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, status)
-VALUES ('А40-999999/2024', 1, 1, 1, '2024-06-01', 'закрыто');
+mysql> SELECT '✅ Успех: все данные вставлены' AS result;
++--------------------------------------------------------+
+| result                                                 |
++--------------------------------------------------------+
+| ✅ Успех: все данные вставлены                          |
++--------------------------------------------------------+
+1 row in set (0,000 sec)
 
--- ===========================================================================
--- ЗАПРОСЫ
--- ===========================================================================
+mysql> SELECT * FROM cases;
++---------+---------------+-------------+-------------+----------+--------------------+------------+------------+----------------------------+
+| case_id | case_number   | category_id | district_id | judge_id | status             | open_date  | close_date | result                     |
++---------+---------------+-------------+-------------+----------+--------------------+------------+------------+----------------------------+
+|       1 | А40-123/2024  |           1 |           1 |        1 | завершено          | 2024-01-10 | 2024-03-15 | удовлетворено              |
++---------+---------------+-------------+-------------+----------+--------------------+------------+------------+----------------------------+
+1 row in set (0,000 sec)
 
--- 1. Список дел, в которых участвует определённое лицо (физ.)
-SELECT c.case_number, pr.name AS role, i.full_name
-FROM cases c
-JOIN case_participants cp ON c.case_id = cp.case_id
-JOIN individuals i ON cp.individual_id = i.individual_id
-JOIN participant_roles pr ON cp.role_id = pr.role_id
-WHERE i.full_name = 'Сидоров Пётр Алексеевич';
+mysql> SELECT * FROM case_participants;SELECT c.case_number, pr.name AS role, i.full_name
++----+---------+---------------+---------+
+| id | case_id | individual_id | role_id |
++----+---------+---------------+---------+
+|  1 |       1 |             1 |       1 |
++----+---------+---------------+---------+
+1 row in set (0,001 sec)
 
--- 2. Список дел, над которыми работает конкретный судья
-SELECT c.case_number, j.full_name, c.open_date
-FROM cases c
-JOIN judges j ON c.judge_id = j.judge_id
-WHERE j.full_name = 'Иванова А.Б.';
+    -> FROM cases c
+    -> JOIN case_participants cp ON c.case_id = cp.case_id
+    -> JOIN individuals i ON cp.individual_id = i.individual_id
+    -> JOIN participant_roles pr ON cp.role_id = pr.role_id
+    -> WHERE i.full_name = 'Сидоров П.А.';
++---------------+------------+-----------------------+
+| case_number   | role       | full_name             |
++---------------+------------+-----------------------+
+| А40-123/2024  | истец      | Сидоров П.А.          |
++---------------+------------+-----------------------+
+1 row in set (0,001 sec)
 
--- 3. Средняя продолжительность рассмотрения дел судьёй
-SELECT 
-    j.full_name,
-    AVG(DATEDIFF(c.close_date, c.open_date)) AS avg_days
-FROM cases c
-JOIN judges j ON c.judge_id = j.judge_id
-WHERE c.status = 'завершено' AND c.close_date IS NOT NULL
-GROUP BY j.judge_id;
+mysql> SELECT c.case_number, j.full_name, c.open_date
+    -> FROM cases c
+    -> JOIN judges j ON c.judge_id = j.judge_id
+    -> WHERE j.full_name = 'Иванова А.Б.';
++---------------+-----------------------+------------+
+| case_number   | full_name             | open_date  |
++---------------+-----------------------+------------+
+| А40-123/2024  | Иванова А.Б.          | 2024-01-10 |
++---------------+-----------------------+------------+
+1 row in set (0,001 sec)
 
--- 4. Рейтинг судей по количеству рассмотренных дел
-SELECT 
-    j.full_name,
-    COUNT(*) AS total_cases
-FROM judges j
-JOIN cases c ON j.judge_id = c.judge_id
-WHERE c.status = 'завершено'
-GROUP BY j.judge_id
-ORDER BY total_cases DESC;
+mysql> SELECT 
+    ->     j.full_name,
+    ->     AVG(DATEDIFF(c.close_date, c.open_date)) AS avg_days
+    -> FROM cases c
+    -> JOIN judges j ON c.judge_id = j.judge_id
+    -> WHERE c.status = 'завершено' AND c.close_date IS NOT NULL
+    -> GROUP BY j.judge_id;
++-----------------------+----------+
+| full_name             | avg_days |
++-----------------------+----------+
+| Иванова А.Б.          |  65.0000 |
++-----------------------+----------+
+1 row in set (0,001 sec)
 
--- 5. Судьи, рассмотревшие >1 дела за последний год
-SELECT 
-    j.full_name,
-    COUNT(*) AS cases_last_year
-FROM judges j
-JOIN cases c ON j.judge_id = c.judge_id
-WHERE c.open_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
-GROUP BY j.judge_id
-HAVING COUNT(*) > 1;
+mysql> SELECT 
+    ->     j.full_name,
+    ->     COUNT(*) AS total_cases
+    -> FROM judges j
+    -> JOIN cases c ON j.judge_id = c.judge_id
+    -> WHERE c.status = 'завершено'
+    -> GROUP BY j.judge_id
+    -> ORDER BY total_cases DESC;
++-----------------------+-------------+
+| full_name             | total_cases |
++-----------------------+-------------+
+| Иванова А.Б.          |           1 |
++-----------------------+-------------+
+1 row in set (0,001 sec)
 
--- 6. Юрлица, выигравшие >50% дел
-WITH plaintiff_stats AS (
-    SELECT 
-        i.full_name,
-        cc.name AS category,
-        COUNT(*) AS total,
-        SUM(CASE WHEN c.result = 'удовлетворено' THEN 1 ELSE 0 END) AS wins
-    FROM cases c
-    JOIN case_participants cp ON c.case_id = cp.case_id
-    JOIN individuals i ON cp.individual_id = i.individual_id
-    JOIN case_categories cc ON c.category_id = cc.category_id
-    JOIN participant_roles pr ON cp.role_id = pr.role_id
-    WHERE pr.name = 'истец'
-    GROUP BY i.individual_id, cc.category_id
-)
-SELECT 
-    full_name,
-    category,
-    total,
-    wins,
-    ROUND(wins / total * 100, 1) AS win_rate_percent
-FROM plaintiff_stats
-WHERE total >= 2 AND wins / total > 0.5;
+mysql> SELECT 
+    ->     j.full_name,
+    ->     COUNT(*) AS cases_last_year
+    -> FROM judges j
+    -> JOIN cases c ON j.judge_id = c.judge_id
+    -> WHERE c.open_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+    -> GROUP BY j.judge_id
+    -> HAVING COUNT(*) > 0;
+Empty set (0,001 sec)
 
--- 7. Категории с наибольшим % неудачных исходов
-SELECT 
-    cc.name AS category,
-    COUNT(*) AS total,
-    SUM(CASE WHEN c.result = 'отказано' THEN 1 ELSE 0 END) AS denied,
-    ROUND(SUM(CASE WHEN c.result = 'отказано' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) AS deny_rate_percent
-FROM cases c
-JOIN case_categories cc ON c.category_id = cc.category_id
-WHERE c.status = 'завершено'
-GROUP BY cc.category_id
-ORDER BY deny_rate_percent DESC;
+mysql> SELECT 
+    ->     j.full_name,
+    ->     COUNT(*) AS cases_last_year
+    -> FROM judges j
+    -> JOIN cases c ON j.judge_id = c.judge_id
+    -> WHERE c.open_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+    -> GROUP BY j.judge_id
+    -> HAVING COUNT(*) > 0;
+Empty set (0,000 sec)
 
--- 8. Физлица, выигравшие все свои дела, и судьи этих дел
-WITH perfect_winners AS (
-    SELECT 
-        i.individual_id,
-        i.full_name,
-        COUNT(*) AS total_cases
-    FROM cases c
-    JOIN case_participants cp ON c.case_id = cp.case_id
-    JOIN individuals i ON cp.individual_id = i.individual_id
-    JOIN participant_roles pr ON cp.role_id = pr.role_id
-    WHERE pr.name = 'истец' AND c.status = 'завершено'
-    GROUP BY i.individual_id
-    HAVING SUM(CASE WHEN c.result = 'удовлетворено' THEN 1 ELSE 0 END) = COUNT(*)
-      AND COUNT(*) >= 1
-)
-SELECT 
-    pw.full_name AS plaintiff,
-    j.full_name AS judge,
-    c.case_number
-FROM perfect_winners pw
-JOIN case_participants cp ON pw.individual_id = cp.individual_id
-JOIN cases c ON cp.case_id = c.case_id
-JOIN judges j ON c.judge_id = j.judge_id
-WHERE c.result = 'удовлетворено';
+mysql> SELECT 'districts' AS table_name, COUNT(*) AS count FROM districts
+    -> UNION ALL
+    -> SELECT 'judges', COUNT(*) FROM judges
+    -> UNION ALL
+    -> SELECT 'individuals', COUNT(*) FROM individuals
+    -> UNION ALL
+    -> SELECT 'cases', COUNT(*) FROM cases
+    -> UNION ALL
+    -> SELECT 'case_participants', COUNT(*) FROM case_participants
+    -> UNION ALL
+    -> SELECT 'documents', COUNT(*) FROM documents;
++-------------------+-------+
+| table_name        | count |
++-------------------+-------+
+| districts         |     1 |
+| judges            |     1 |
+| individuals       |     1 |
+| cases             |     1 |
+| case_participants |     1 |
+| documents         |     1 |
++-------------------+-------+
+6 rows in set (0,001 sec)
 
--- 9. Динамика количества дел по категориям за периоды
-SELECT 
-    cc.name AS category,
-    YEAR(c.open_date) AS year,
-    COUNT(*) AS cases_count
-FROM cases c
-JOIN case_categories cc ON c.category_id = cc.category_id
-WHERE c.open_date >= '2024-01-01'
-GROUP BY cc.category_id, YEAR(c.open_date)
-ORDER BY category, year;
+mysql> INSERT INTO documents (case_id, judge_id, title, issue_date)
+    -> VALUES (1, 1, 'Определение', CURDATE());
+Query OK, 1 row affected (0,005 sec)
 
--- 10. Судебные округа с лучшей статистикой по категории (по % удовлетворённых)
-SELECT 
-    d.name AS district,
-    cc.name AS category,
-    COUNT(*) AS total,
-    ROUND(AVG(CASE WHEN c.result = 'удовлетворено' THEN 1.0 ELSE 0 END) * 100, 1) AS satisfaction_rate
-FROM cases c
-JOIN districts d ON c.district_id = d.district_id
-JOIN case_categories cc ON c.category_id = cc.category_id
-WHERE c.status = 'завершено'
-GROUP BY d.district_id, cc.category_id
-HAVING total >= 1
-ORDER BY category, satisfaction_rate DESC;
+mysql> INSERT INTO cases (case_number, category_id, district_id, judge_id, open_date, status)
+    -> VALUES ('А40-999/2024', 1, 1, 1, '2024-06-01', 'закрыто');
+Query OK, 1 row affected (0,003 sec)
 
--- 11. Добавление нового участника (физ. лица)
-INSERT INTO individuals (full_name, birth_date, phone, email)
-VALUES ('Новиков Алексей Сергеевич', '1988-11-30', '+79261112233', 'novikov@example.com');
+mysql> 
+mysql> DELETE FROM cases 
+    -> WHERE case_number = 'А40-999/2024' AND status = 'закрыто';
+Query OK, 1 row affected (0,001 sec)
 
--- 12. Обновление контактной информации участника по ФИО
-UPDATE individuals 
-SET email = 'sidorov.updated@example.com', phone = '+79998887766'
-WHERE full_name = 'Сидоров Пётр Алексеевич';
+mysql> UPDATE individuals 
+    -> SET email = 'sidorov.updated@example.com', phone = '+79998887766'
+    -> WHERE full_name = 'Сидоров П.А.';
+Query OK, 1 row affected (0,002 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
 
--- 13. Удаление дела, закрытого/снятого с рассмотрения (пример удаления дела 2)
-DELETE FROM cases WHERE case_id = 2 AND status IN ('закрыто', 'снято');
--- Примечание: ON DELETE CASCADE автоматически удалит записи в case_participants и documents
+mysql> INSERT INTO individuals (full_name, birth_date, phone, email)
+    -> VALUES ('Морозова Е.П.', '1992-04-18', '+79876543210', 'morozova@example.com');
+Query OK, 1 row affected (0,002 sec)
 
--- 14. Добавление нового судебного документа
-INSERT INTO documents (case_id, judge_id, title, issue_date)
-VALUES (
-    1, 
-    (SELECT judge_id FROM cases WHERE case_id = 1),
-    'Решение суда',
-    CURDATE()
-);
+mysql> SELECT 
+    ->     d.name AS district,
+    ->     cc.name AS category,
+    ->     COUNT(*) AS total,
+    ->     ROUND(AVG(CASE WHEN c.result = 'удовлетворено' THEN 1.0 ELSE 0 END) * 100, 1) AS satisfaction_rate
+    -> FROM cases c
+    -> JOIN districts d ON c.district_id = d.district_id
+    -> JOIN case_categories cc ON c.category_id = cc.category_id
+    -> WHERE c.status = 'завершено'
+    -> GROUP BY d.district_id, cc.category_id
+    -> HAVING total >= 1
+    -> ORDER BY category, satisfaction_rate DESC;
++----------------------+------------------------+-------+-------------------+
+| district             | category               | total | satisfaction_rate |
++----------------------+------------------------+-------+-------------------+
+| Московский           | Гражданские            |     1 |             100.0 |
++----------------------+------------------------+-------+-------------------+
+1 row in set (0,001 sec)
+
+mysql> SELECT 
+    ->     cc.name AS category,
+    ->     YEAR(c.open_date) AS year,
+    ->     COUNT(*) AS cases_count
+    -> FROM cases c
+    -> JOIN case_categories cc ON c.category_id = cc.category_id
+    -> WHERE c.open_date >= '2024-01-01'
+    -> GROUP BY cc.category_id, YEAR(c.open_date)
+    -> ORDER BY category, year;
++------------------------+------+-------------+
+| category               | year | cases_count |
++------------------------+------+-------------+
+| Гражданские            | 2024 |           1 |
++------------------------+------+-------------+
+1 row in set (0,001 sec)
+
+mysql> WITH perfect_winners AS (
+    ->     SELECT i.individual_id, i.full_name
+    ->     FROM cases c
+    ->     JOIN case_participants cp ON c.case_id = cp.case_id
+    ->     JOIN individuals i ON cp.individual_id = i.individual_id
+    ->     JOIN participant_roles pr ON cp.role_id = pr.role_id
+    ->     WHERE pr.name = 'истец' AND c.status = 'завершено'
+    ->     GROUP BY i.individual_id
+    ->     HAVING SUM(CASE WHEN c.result = 'удовлетворено' THEN 1 ELSE 0 END) = COUNT(*)
+    -> )
+    -> SELECT 
+    ->     pw.full_name AS plaintiff,
+    ->     j.full_name AS judge,
+    ->     c.case_number
+    -> FROM perfect_winners pw
+    -> JOIN case_participants cp ON pw.individual_id = cp.individual_id
+    -> JOIN cases c ON cp.case_id = c.case_id
+    -> JOIN judges j ON c.judge_id = j.judge_id
+    -> WHERE c.result = 'удовлетворено';
++-----------------------+-----------------------+---------------+
+| plaintiff             | judge                 | case_number   |
++-----------------------+-----------------------+---------------+
+| Сидоров П.А.          | Иванова А.Б.          | А40-123/2024  |
++-----------------------+-----------------------+---------------+
+1 row in set (0,001 sec)
+
+mysql> SELECT 
+    ->     cc.name AS category,
+    ->     COUNT(*) AS total,
+    ->     SUM(CASE WHEN c.result = 'отказано' THEN 1 ELSE 0 END) AS denied,
+    ->     ROUND(SUM(CASE WHEN c.result = 'отказано' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) AS deny_rate_percent 
+    -> FROM cases c
+    -> JOIN case_categories cc ON c.category_id = cc.category_id
+    -> WHERE c.status = 'завершено'
+    -> GROUP BY cc.category_id
+    -> ORDER BY deny_rate_percent DESC;
++------------------------+-------+--------+-------------------+
+| category               | total | denied | deny_rate_percent |
++------------------------+-------+--------+-------------------+
+| Гражданские            |     1 |      0 |               0.0 |
++------------------------+-------+--------+-------------------+
+1 row in set (0,001 sec)
+
+mysql> WITH plaintiff_stats AS (
+    ->     SELECT 
+    ->         i.full_name,
+    ->         cc.name AS category,
+    ->         COUNT(*) AS total,
+    ->         SUM(CASE WHEN c.result = 'удовлетворено' THEN 1 ELSE 0 END) AS wins
+    ->     FROM cases c
+    ->     JOIN case_participants cp ON c.case_id = cp.case_id
+    ->     JOIN individuals i ON cp.individual_id = i.individual_id
+    ->     JOIN case_categories cc ON c.category_id = cc.category_id
+    ->     JOIN participant_roles pr ON cp.role_id = pr.role_id
+    ->     WHERE pr.name = 'истец' AND c.status = 'завершено'
+    ->     GROUP BY i.individual_id, cc.category_id
+    -> )
+    -> SELECT 
+    ->     full_name,
+    ->     category,
+    ->     total,
+    ->     wins,
+    ->     ROUND(wins / total * 100, 1) AS win_rate_percent
+    -> FROM plaintiff_stats
+    -> WHERE total >= 1 AND wins / total > 0.5;
++-----------------------+------------------------+-------+------+------------------+
+| full_name             | category               | total | wins | win_rate_percent |
++-----------------------+------------------------+-------+------+------------------+
+| Сидоров П.А.          | Гражданские            |     1 |    1 |            100.0 |
++-----------------------+------------------------+-------+------+------------------+
+1 row in set (0,001 sec)
+
+mysql> UPDATE cases 
+    -> SET open_date = CURDATE() - INTERVAL 6 MONTH
+    -> WHERE case_number = 'А40-123/2024';
+Query OK, 1 row affected (0,002 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql> SELECT 
+    ->     j.full_name,
+    ->     COUNT(*) AS cases_last_year
+    -> FROM judges j
+    -> JOIN cases c ON j.judge_id = c.judge_id
+    -> WHERE c.open_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+    -> GROUP BY j.judge_id
+    -> HAVING COUNT(*) > 0;
++-----------------------+-----------------+
+| full_name             | cases_last_year |
++-----------------------+-----------------+
+| Иванова А.Б.          |               1 |
++-----------------------+-----------------+
+1 row in set (0,001 sec)
+
