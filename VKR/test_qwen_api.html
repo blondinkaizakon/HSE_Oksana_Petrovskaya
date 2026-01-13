@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест Qwen API</title>
+</head>
+<body>
+    <h1>Тест Qwen API</h1>
+    <button onclick="testAPI()">Тест API</button>
+    <pre id="result"></pre>
+    <script>
+        async function testAPI() {
+            const resultEl = document.getElementById('result');
+            resultEl.textContent = 'Запрос к API...';
+            
+            try {
+                // Тест 1: Health check
+                const healthRes = await fetch('http://localhost:8001/health');
+                const healthData = await healthRes.json();
+                resultEl.textContent += '\nHealth: ' + JSON.stringify(healthData, null, 2);
+                
+                // Тест 2: Generate
+                const genRes = await fetch('http://localhost:8001/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        prompt: 'Тест: верни JSON {"test": "ok"}',
+                        max_new_tokens: 100
+                    })
+                });
+                const genData = await genRes.json();
+                resultEl.textContent += '\n\nGenerate: ' + JSON.stringify(genData, null, 2);
+            } catch (error) {
+                resultEl.textContent += '\n\nОшибка: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

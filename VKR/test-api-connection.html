@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест подключения к API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Тест подключения к API</h1>
+    
+    <div class="test-section">
+        <h2>1. Тест LLMost API</h2>
+        <button onclick="testLLMostAPI()">Проверить LLMost API</button>
+        <div id="llmost-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Тест RAG API (локальный)</h2>
+        <button onclick="testRAGAPI()">Проверить RAG API</button>
+        <div id="rag-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Тест Qwen API (локальный)</h2>
+        <button onclick="testQwenAPI()">Проверить Qwen API</button>
+        <div id="qwen-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Полный тест анализа</h2>
+        <button onclick="testFullAnalysis()">Тест анализа текста</button>
+        <div id="analysis-result"></div>
+    </div>
+
+    <script>
+        const API_KEY = 'llmost_KxTBngg_6TEGpMmC4XXrHXLaAHVuwnyU0TjNG7Gsp7wJS5eiaL9q2hDET0pmMrWm';
+        const LLMOST_URL = 'https://llmost.ru/api/v1';
+        
+        async function testLLMostAPI() {
+            const resultDiv = document.getElementById('llmost-result');
+            resultDiv.innerHTML = '<p>Проверка...</p>';
+            
+            try {
+                const response = await fetch(`${LLMOST_URL}/models`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<p class="success">✅ LLMost API доступен!</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Ошибка: ${response.status} ${response.statusText}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Ошибка подключения: ${error.message}</p><pre>${error.stack}</pre>`;
+            }
+        }
+        
+        async function testRAGAPI() {
+            const resultDiv = document.getElementById('rag-result');
+            resultDiv.innerHTML = '<p>Проверка...</p>';
+            
+            try {
+                const response = await fetch('/api/rag/context', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: 'тест',
+                        k: 1
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<p class="success">✅ RAG API доступен!</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Ошибка: ${response.status} ${response.statusText}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Ошибка подключения: ${error.message}</p><pre>${error.stack}</pre>`;
+            }
+        }
+        
+        async function testQwenAPI() {
+            const resultDiv = document.getElementById('qwen-result');
+            resultDiv.innerHTML = '<p>Проверка...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8001/health');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<p class="success">✅ Qwen API доступен!</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Ошибка: ${response.status} ${response.statusText}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Ошибка подключения: ${error.message}</p><p>Возможно, это проблема CORS. Проверьте консоль браузера.</p>`;
+            }
+        }
+        
+        async function testFullAnalysis() {
+            const resultDiv = document.getElementById('analysis-result');
+            resultDiv.innerHTML = '<p>Проверка...</p>';
+            
+            try {
+                const prompt = 'Проанализируй этот текст: У нас есть договор ГПХ с сотрудником.';
+                
+                const response = await fetch(`${LLMOST_URL}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: 'google/gemini-2.5-flash',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        max_tokens: 500,
+                        temperature: 0.7
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const text = data.choices?.[0]?.message?.content || 'Нет ответа';
+                    resultDiv.innerHTML = `<p class="success">✅ Анализ выполнен успешно!</p><pre>${text}</pre>`;
+                } else {
+                    const errorText = await response.text();
+                    resultDiv.innerHTML = `<p class="error">❌ Ошибка: ${response.status} ${response.statusText}</p><pre>${errorText}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Ошибка подключения: ${error.message}</p><pre>${error.stack}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>
+

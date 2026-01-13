@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тест Qwen API из браузера</title>
+</head>
+<body>
+    <h1>Тест Qwen API из браузера</h1>
+    <button onclick="testHealth()">1. Тест Health</button>
+    <button onclick="testGenerate()">2. Тест Generate</button>
+    <pre id="result" style="background: #f0f0f0; padding: 20px; border: 1px solid #ccc;"></pre>
+    
+    <script>
+        const resultEl = document.getElementById('result');
+        const hostname = window.location.hostname;
+        const apiUrl = `http://${hostname}:8001`;
+        
+        async function testHealth() {
+            resultEl.textContent = 'Проверка Health...\n';
+            try {
+                const response = await fetch(`${apiUrl}/health`);
+                const data = await response.json();
+                resultEl.textContent += `✅ Health OK:\n${JSON.stringify(data, null, 2)}\n\n`;
+                resultEl.textContent += `API URL: ${apiUrl}\n`;
+            } catch (error) {
+                resultEl.textContent += `❌ Ошибка Health:\n${error.message}\n\n`;
+                resultEl.textContent += `API URL: ${apiUrl}\n`;
+            }
+        }
+        
+        async function testGenerate() {
+            resultEl.textContent += '\nПроверка Generate...\n';
+            try {
+                const response = await fetch(`${apiUrl}/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: 'Тест: верни JSON {"test":"ok"}',
+                        max_new_tokens: 50
+                    })
+                });
+                const data = await response.json();
+                resultEl.textContent += `✅ Generate OK:\n${JSON.stringify(data, null, 2).substring(0, 500)}\n\n`;
+            } catch (error) {
+                resultEl.textContent += `❌ Ошибка Generate:\n${error.message}\n\n`;
+            }
+        }
+        
+        // Автоматически проверяем при загрузке
+        window.onload = () => {
+            resultEl.textContent = `Текущий хост: ${hostname}\nAPI URL: ${apiUrl}\n\n`;
+            testHealth();
+        };
+    </script>
+</body>
+</html>
+
