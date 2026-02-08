@@ -1,5 +1,0 @@
-requests
-selenium
-pandas
-webdriver-manager
-openpyxl
